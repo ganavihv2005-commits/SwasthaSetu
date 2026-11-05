@@ -1,0 +1,201 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCurrentUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'ganavihv2005@gmail.com' ||
+        (hasUserDoc() && getUserData().role == 'admin')
+      );
+    }
+
+    function isDoctor() {
+      return isSignedIn() && hasUserDoc() && getUserData().role == 'doctor' && getUserData().status == 'active';
+    }
+
+    function isHealthWorker() {
+      return isSignedIn() && hasUserDoc() && getUserData().role == 'healthWorker' && getUserData().status == 'active';
+    }
+
+    function isPatient() {
+      return isSignedIn() && hasUserDoc() && getUserData().role == 'patient' && getUserData().status == 'active';
+    }
+
+    function isAssignedToVillage(village) {
+      return isAdmin() || (
+        hasUserDoc() && (
+          getUserData().assignedVillages.hasAny([village]) ||
+          getUserData().assignedVillages.hasAny(['all'])
+        )
+      );
+    }
+
+    function isLinkedPatient(patientId) {
+      return isPatient() && getUserData().linkedPatientId == patientId;
+    }
+
+    // Validations
+    function isValidVitalRange(type, value) {
+      return (type == 'systolic' && value >= 50 && value <= 300) ||
+             (type == 'diastolic' && value >= 30 && value <= 200) ||
+             (type == 'bloodSugar' && value >= 20 && value <= 800) ||
+             (type == 'weight' && value >= 1 && value <= 300);
+    }
+
+    // ==========================================
+    // 1. USERS COLLECTION
+    // ==========================================
+    match /users/{userId} {
+      allow read: if isAdmin() || isCurrentUser(userId);
+
+      // Self registration: first user or bootstrap admin, else 'pending'
+      allow create: if isCurrentUser(userId) && (
+        (request.auth.token.email == 'ganavihv2005@gmail.com' && request.resource.data.role == 'admin') ||
+        request.resource.data.role == 'pending'
+      );
+
+      // Admin can change roles and village assignments.
+      // User can update their own language, name, or link their patient ID. User can NEVER change their own role.
+      allow update: if isAdmin() || (
+        isCurrentUser(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'assignedVillages'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 2. PATIENTS COLLECTION
+    // ==========================================
+    match /patients/{patientId} {
+      allow read: if isAdmin() ||
+                     (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                     (isHealthWorker() && isAssignedToVillage(resource.data.village)) ||
+                     isLinkedPatient(patientId);
+
+      // Creation requires mandatory consent
+      allow create: if (isAdmin() ||
+                        (isDoctor() && isAssignedToVillage(request.resource.data.village)) ||
+                        (isHealthWorker() && isAssignedToVillage(request.resource.data.village))) &&
+                       request.resource.data.consentGiven == true;
+
+      // Doctors can update clinical observations. Patients can only toggle their own consent.
+      allow update: if isAdmin() ||
+                       (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                       (isHealthWorker() && isAssignedToVillage(resource.data.village) &&
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskOverridden', 'riskOverriddenReason'])) ||
+                       (isLinkedPatient(patientId) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consentGiven', 'consentWithdrawnAt', 'updatedAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 3. VISITS COLLECTION
+    // ==========================================
+    match /visits/{visitId} {
+      allow read: if isAdmin() ||
+                     (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                     (isHealthWorker() && isAssignedToVillage(resource.data.village)) ||
+                     (isPatient() && getUserData().linkedPatientId == resource.data.patientId);
+
+      allow create: if isAdmin() ||
+                       (isDoctor() && isAssignedToVillage(request.resource.data.village)) ||
+                       (isHealthWorker() && isAssignedToVillage(request.resource.data.village));
+
+      allow update: if isAdmin() || (isDoctor() && isAssignedToVillage(resource.data.village));
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 4. READINGS COLLECTION
+    // ==========================================
+    match /readings/{readingId} {
+      allow read: if isAdmin() ||
+                     (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                     (isHealthWorker() && isAssignedToVillage(resource.data.village)) ||
+                     (isPatient() && getUserData().linkedPatientId == resource.data.patientId);
+
+      allow create: if (
+        (isAdmin() ||
+         (isDoctor() && isAssignedToVillage(request.resource.data.village)) ||
+         (isHealthWorker() && isAssignedToVillage(request.resource.data.village))) &&
+        isValidVitalRange(request.resource.data.type, request.resource.data.value)
+      ) || (
+        isPatient() &&
+        getUserData().linkedPatientId == request.resource.data.patientId &&
+        request.resource.data.source == 'patient' &&
+        isValidVitalRange(request.resource.data.type, request.resource.data.value)
+      );
+
+      allow update: if isAdmin() || (isDoctor() && isAssignedToVillage(resource.data.village));
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 5. ALERTS COLLECTION
+    // ==========================================
+    match /alerts/{alertId} {
+      allow read: if isAdmin() ||
+                     (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                     (isHealthWorker() && isAssignedToVillage(resource.data.village)) ||
+                     (isPatient() && getUserData().linkedPatientId == resource.data.patientId);
+
+      allow create: if isAdmin() || isDoctor() || isHealthWorker();
+
+      allow update: if isAdmin() ||
+                       (isDoctor() && isAssignedToVillage(resource.data.village)) ||
+                       (isHealthWorker() && isAssignedToVillage(resource.data.village));
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 6. GUIDELINES COLLECTION
+    // ==========================================
+    match /guidelines/{guidelineId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // 7. AUDIT LOGS (APPEND-ONLY, IMMUTABLE)
+    // ==========================================
+    match /auditLogs/{logId} {
+      // Patients can view audit events for their own patient record ("Who viewed my record")
+      allow read: if isAdmin() || (
+        isPatient() &&
+        resource.data.resource == 'patient' &&
+        resource.data.resourceId == getUserData().linkedPatientId
+      );
+
+      // Append-only by authenticated users recording their activities
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+
+      // Tamper-evident: strictly no updates or deletes permitted
+      allow update, delete: if false;
+    }
+  }
+}

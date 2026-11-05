@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <script>
+      // In AI Studio preview, HMR is disabled. Intercept and suppress benign WebSocket connection notices.
+      (function() {
+        var isWsError = function(str) {
+          if (!str) return false;
+          var s = String(str);
+          return s.indexOf('WebSocket') !== -1 || s.indexOf('ws://') !== -1 || s.indexOf('wss://') !== -1 || s.indexOf('closed without opened') !== -1;
+        };
+
+        window.addEventListener('error', function (e) {
+          var msg = (e && e.message) || (e && e.error && e.error.message) || '';
+          if (isWsError(msg)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = (e && e.reason && (e.reason.message || e.reason.stack || e.reason)) || '';
+          if (isWsError(reason)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        var origError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var joined = args.map(function(a) {
+            return (a && a.stack) || (a && a.message) || String(a);
+          }).join(' ');
+          if (isWsError(joined)) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+      })();
+    </script>
+    <title>SwasthaSetu - Traveling Doctor Assistant</title>
+    <meta name="description" content="Mobile-first offline PWA empowering traveling doctors with longitudinal records, disease progression watch, and visit briefs in rural villages." />
+    <meta property="og:title" content="SwasthaSetu - Traveling Doctor Assistant" />
+    <meta property="og:description" content="Mobile-first offline PWA empowering traveling doctors with longitudinal records, disease progression watch, and visit briefs in rural villages." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0d9488" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SwasthaSetu" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-teal-100 selection:text-teal-900 min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

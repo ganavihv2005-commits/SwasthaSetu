@@ -1,0 +1,6 @@
+{
+  "name": "SwasthaSetu - Traveling Doctor Assistant",
+  "description": "Mobile-first offline PWA empowering traveling doctors with longitudinal records, disease progression watch, and visit briefs in rural villages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

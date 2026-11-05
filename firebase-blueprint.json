@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control and village assignments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["admin", "doctor", "healthWorker", "patient", "pending"] },
+        "status": { "type": "string", "enum": ["active", "pending", "disabled"] },
+        "assignedVillages": { "type": "array" },
+        "language": { "type": "string", "enum": ["en", "hi", "kn"] },
+        "linkedPatientId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "name", "role", "status", "createdAt"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Longitudinal rural patient record with chronic conditions and consent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "age": { "type": "number" },
+        "sex": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "village": { "type": "string", "maxLength": 100 },
+        "conditions": { "type": "array" },
+        "consentGiven": { "type": "boolean" },
+        "consentAt": { "type": "string" },
+        "consentWithdrawnAt": { "type": "string" },
+        "linkCode": { "type": "string", "maxLength": 32 },
+        "linkCodeExpiresAt": { "type": "string" },
+        "linkedUserId": { "type": "string", "maxLength": 128 },
+        "lastVisitDate": { "type": "string" },
+        "riskStatus": { "type": "string", "enum": ["Stable", "Watch", "Worsening", "Insufficient Data"] },
+        "riskReason": { "type": "string", "maxLength": 500 },
+        "riskOverridden": { "type": "boolean" },
+        "riskOverriddenReason": { "type": "string", "maxLength": 500 },
+        "riskDismissed": { "type": "boolean" },
+        "isDemo": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "age", "sex", "village", "conditions", "consentGiven", "createdAt"]
+    },
+    "Visit": {
+      "title": "Visit",
+      "description": "Clinical encounter recorded during doctor rounds or health worker checkups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "village": { "type": "string" },
+        "date": { "type": "string" },
+        "vitals": { "type": "object" },
+        "symptoms": { "type": "array" },
+        "medicines": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "enteredBy": { "type": "string" },
+        "enteredByRole": { "type": "string", "enum": ["doctor", "healthWorker", "admin"] },
+        "isDemo": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "patientId", "village", "date", "enteredBy", "enteredByRole", "createdAt"]
+    },
+    "Reading": {
+      "title": "Reading",
+      "description": "Between-visit or point-of-care vital sign measurement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "village": { "type": "string" },
+        "type": { "type": "string", "enum": ["systolic", "diastolic", "bloodSugar", "weight"] },
+        "value": { "type": "number" },
+        "measuredAt": { "type": "string" },
+        "source": { "type": "string", "enum": ["doctor", "healthWorker", "patient"] },
+        "enteredBy": { "type": "string" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "isDemo": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "patientId", "village", "type", "value", "measuredAt", "source", "enteredBy", "createdAt"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "Clinical decision support alerts for follow-ups and deterioration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "village": { "type": "string" },
+        "type": { "type": "string", "enum": ["follow_up", "deterioration", "overdue"] },
+        "reason": { "type": "string", "maxLength": 500 },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "done", "dismissed"] },
+        "isDemo": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "resolvedAt": { "type": "string" },
+        "resolvedBy": { "type": "string" }
+      },
+      "required": ["id", "patientId", "village", "type", "reason", "dueDate", "status", "createdAt"]
+    },
+    "Guideline": {
+      "title": "Guideline",
+      "description": "Clinical reference target ranges reviewed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "parameter": { "type": "string", "enum": ["systolic", "diastolic", "bloodSugar", "weight"] },
+        "condition": { "type": "string" },
+        "targetMin": { "type": "number" },
+        "targetMax": { "type": "number" },
+        "unit": { "type": "string" },
+        "source": { "type": "string" },
+        "note": { "type": "string" },
+        "isDemo": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "parameter", "condition", "targetMin", "targetMax", "unit", "source"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Append-only tamper-evident security and clinical access audit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "action": { "type": "string", "enum": ["view", "create", "edit", "override_risk", "dismiss_risk", "sync", "update_guideline", "reset_data", "resolve_alert", "signin", "role_change", "withdraw_consent", "link_patient"] },
+        "resource": { "type": "string", "enum": ["patient", "visit", "reading", "alert", "guideline", "system", "user"] },
+        "resourceId": { "type": "string" },
+        "details": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "userName", "userRole", "action", "resource", "details", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Staff and patient user profiles"
+    },
+    "/patients/{patientId}": {
+      "schema": { "$ref": "#/entities/Patient" },
+      "description": "Longitudinal chronic patient records"
+    },
+    "/visits/{visitId}": {
+      "schema": { "$ref": "#/entities/Visit" },
+      "description": "Clinic visits and encounter histories"
+    },
+    "/readings/{readingId}": {
+      "schema": { "$ref": "#/entities/Reading" },
+      "description": "Point-of-care and between-visit vitals"
+    },
+    "/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/Alert" },
+      "description": "Automated decision support follow-up and deterioration alerts"
+    },
+    "/guidelines/{guidelineId}": {
+      "schema": { "$ref": "#/entities/Guideline" },
+      "description": "Target ranges and clinical governance guidelines"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only audit events log"
+    }
+  }
+}
